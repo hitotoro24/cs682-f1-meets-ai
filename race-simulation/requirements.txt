@@ -1,0 +1,16 @@
+# Tested with Python 3.11 on macOS (Apple Silicon).
+# The original 2020 pins (Python 3.8, TensorFlow 2.2) cannot be installed on Apple Silicon.
+# NumPy must stay < 2: TensorFlow 2.16 is built against NumPy 1.x.
+numpy==1.26.4
+pandas==2.3.3
+scipy==1.17.1
+matplotlib==3.10.9
+# required in opt_strategy_basic
+cvxpy==1.5.4
+# required for VSE (supervised and reinforcement training and inferencing)
+tensorflow==2.16.2
+# real race data (laps, results); lap data needs an F1 TV account
+fastf1==3.9.2
+# required only for VSE reinforcement training (main_train_rl_agent_dqn.py); not tested with TF 2.16
+# tensorflow-probability
+# tf-agents
