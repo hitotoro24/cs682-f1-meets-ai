@@ -88,16 +88,16 @@ Use Max Verstappen (VER) as the initial target driver, with other drivers follow
 
 Do not assume the FastF1 end-of-lap row exactly matches the simulator pre-pit state. Pit-in timing, final lap time, post-pit position and next compound can leak the action into features. Confirm alignment and use prior-lap information where necessary. The toy one-lap example is a wiring test, not a training sample sufficient to fit a model.
 
-## Suggested team work (confirm ownership together)
+## Open team workstreams (unassigned)
 
-| Owner | Immediate output | Report section |
+| Workstream | Immediate output | Report section |
 |---|---|---|
-| Tony | Shared feature mapping for one VER lap, including decision timing and a logged comparison of historical vs simulator fields; coordinate integration. | Introduction, integration, experimental design |
-| Anh | Reproduce the committed replay; identify the VSE entry/exit contract and test a simple custom policy for VER without changing other drivers. | Simulator, policy integration |
-| Henry | Design a current-state MLP baseline and later a causal GRU/LSTM using a common input schema; provide a small forward-pass test and document model input/output shapes. | Model methods, sequence comparison |
-| Shujie | Audit historical features/labels and class imbalance; define race-level splits and prediction metrics; check the one-lap example for leakage. | Data, evaluation, limitations |
+| [Integration](https://github.com/hitotoro24/cs682-f1-meets-ai/issues/1) | Shared feature mapping for one VER lap, including decision timing and a logged comparison of historical vs simulator fields; coordinate integration. | Introduction, integration, experimental design |
+| [Simulator](https://github.com/hitotoro24/cs682-f1-meets-ai/issues/2) | Reproduce the committed replay; identify the VSE entry/exit contract and test a simple custom policy for VER without changing other drivers. | Simulator, policy integration |
+| [Models](https://github.com/hitotoro24/cs682-f1-meets-ai/issues/3) | Design a current-state MLP baseline and later a causal GRU/LSTM using a common input schema; provide a small forward-pass test and document model input/output shapes. | Model methods, sequence comparison |
+| [Data and evaluation](https://github.com/hitotoro24/cs682-f1-meets-ai/issues/4) | Audit historical features/labels and class imbalance; define race-level splits and prediction metrics; check the one-lap example for leakage. | Data, evaluation, limitations |
 
-Before the next meeting (proposed checkpoint: Sunday November 22 at 3 PM), each owner should post a small PR or an issue comment containing the exact artifact produced, how it was tested, and any blocker. Roles are proposed, not final assignments. Keep Notion for coordination and GitHub for reproducible artifacts; everybody contributes to the report.
+Before the next meeting (proposed checkpoint: Sunday November 22 at 3 PM), each workstream should produce a small PR or an issue comment containing the exact artifact produced, how it was tested, and any blocker. All tasks remain unassigned until the team reviews the scope and dependencies. Keep Notion for coordination and GitHub for reproducible artifacts; everybody contributes to the report.
 
 ## Scope after the milestone
 
