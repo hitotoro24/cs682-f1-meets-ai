@@ -32,22 +32,42 @@ flowchart TD
 ## Connection to prior work
 
 - Heilmeier et al. (2020), *Virtual Strategy Engineer: Using Artificial Neural Networks for Making Race Strategy Decisions in Circuit Motorsport* ([paper](https://doi.org/10.3390/app10217805)): provides the strategy-engine and simulation framework. Its supervised VSE separates tyre-change and compound-choice decisions.
-- Sasikumar et al. (2025), *Data-driven pit stop decision support for Formula 1 using deep learning models*: motivates learning pit decisions from FastF1 lap sequences and comparing sequential architectures.
+- Sasikumar et al. (2025), *Data-driven pit stop decision support for Formula 1 using deep learning models* ([paper](https://doi.org/10.3389/frai.2025.1673148)): motivates learning pit decisions from FastF1 lap sequences and comparing sequential architectures.
 - Our question connects the two approaches: does better historical prediction translate into better simulated race outcomes? This is a research question, not a result we have already established.
 
 Upstream simulator: [TUMFTM/race-simulation](https://github.com/TUMFTM/race-simulation). Historical data library: [FastF1](https://github.com/theOehrly/Fast-F1).
 
-## Current status (November 19, 2026)
+## Current status (November 20, 2026)
 
 | Component | Status / evidence |
 |---|---|
 | Simulator | Ported to Python 3.11 in commit [d86ff05](https://github.com/hitotoro24/cs682-f1-meets-ai/commit/d86ff05c56b456fbded2c3581fdc2ae30a219247). |
 | Historical replay | [Sanity-check script](race-simulation/experiments/sanity_check.py) and [saved output](race-simulation/experiments/sanity_Silverstone_2019.csv) exist. |
-| FastF1 training pipeline | Preliminary EDA discussed by team; reproducible feature/label pipeline not yet present in this repository. |
-| Learned policy | No new trained model or adapter verified in this repository yet. |
-| Integrated comparison | Pending. |
+| FastF1 training pipeline | Minimal shared NumPy encoder and FastF1 extraction implemented; real data not run here. |
+| Learned policy | PyTorch MLP and synthetic training smoke test implemented and tested; no model trained on real data. |
+| Integrated comparison | VSE hook and fixed lap-24 experiment implemented; live simulator execution pending. |
 
 The committed replay CSV records Hamilton P1 in both real and simulated races, with simulated winner time 4878.23 s versus actual 4868.45 s. Verstappen is P2 in simulation versus P5 in reality. This is evidence of an existing replay output and a reason to investigate simulator fidelity, not proof of accuracy or an independently reproduced result.
+
+## Start here — guided proof of concept
+
+- [01_silverstone_proof_of_concept.ipynb](01_silverstone_proof_of_concept.ipynb): coursework-style notebook, with setup, purpose, tests, inline questions and opt-in real-data/simulator cells.
+- [f1_ai/pit_pipeline.py](f1_ai/pit_pipeline.py): shared NumPy encoding, FastF1 examples, PyTorch MLP, synthetic test and VSE decision trace.
+- [Experiment plan](docs/experiment_plan.md): E0–E5, concrete deliverables, dependencies and acceptance criteria. Workstreams remain unassigned.
+
+From the repository root, activate the existing Python 3.11 simulator environment (see below), then:
+
+```bash
+python -m pip install torch jupyter
+python -m f1_ai.pit_pipeline smoke
+python -m f1_ai.pit_pipeline data   # requires live FastF1 lap access
+python -m f1_ai.pit_pipeline race   # requires working TUM dependencies
+jupyter notebook 01_silverstone_proof_of_concept.ipynb
+```
+
+Run the smoke test first. Real modes are intentionally separate, so broken data access cannot silently produce toy race results. Outputs go to `local_results/`. The minimal input vector is start-of-lap progress, previous-lap position fraction and prior stop count. Expand features only after auditing both sources. The alternative forces a single VER stop at lap 24 on A2 to test the intervention; it does not use a trained model yet.
+
+**Verified:** synthetic feature/timing checks and training smoke test passed; toy BCE 0.714567 → 0.000583. From the saved prior replay, mean absolute position error is 1.90 and Spearman correlation is 0.901 across 20 drivers. Neither is new real-race training evidence. Live FastF1 retrieval, simulator execution and notebook end-to-end execution remain unverified here.
 
 ## Reproduce the existing replay
 
@@ -72,11 +92,11 @@ Use Max Verstappen (VER) as the initial target driver, with other drivers follow
 3. Document how each shared feature is calculated on both sides. The same schema, units, encoding and timing must be used at training and inference.
 4. Pass simulator state to a simple test policy; confirm that the returned pit/no-pit action (and valid compound, if applicable) reaches the simulator. Log inputs and decisions. Then check a full race with the same policy.
 
-**Proposed shared feature contract (to validate together):**
+**Proposed expanded feature contract (to validate together):**
 
 | Field | Meaning / constraint |
 |---|---|
-| race progress | current lap / planned race laps |
+| race progress | (current lap - 1) / planned race laps for start-of-lap decisions |
 | tyre age | laps on current tyre set at decision time; reconcile simulator degradation-age semantics |
 | compound | current tyre compound mapped consistently across sources |
 | position | position known before the pit decision |
