@@ -228,3 +228,6 @@ race-simulation/racesim/input/parameters/*_realstrat.ini
 race-simulation/racesim/output/
 # macOS
 .DS_Store
+
+# Local project experiment outputs and caches
+local_results/
