@@ -8,21 +8,47 @@ A pit stop trades immediate time loss for improved future tyre performance. A st
 
 This is a retrospective, simulation-based study, not a claim of real-world optimality or a live race engineering system.
 
-## How the pieces fit together
+## Project architecture
+
+The workflow has two stages: learn a pit-decision model from historical data, then test the same fitted model in a closed-loop simulation. The shared feature encoder connects them.
+
+### A. Offline training and prediction evaluation
 
 ```mermaid
 flowchart TD
-    A[FastF1 historical laps] --> B[Decision-time features and labels]
-    B --> C[Train current-state and sequence models]
-    C --> D[Offline evaluation]
-    C --> E[Policy adapter]
-    F[TUM race simulator] --> G[Pre-pit decision state]
-    G --> E
-    E --> H[Pit or stay; compound if pit]
-    H --> F
-    F --> I[Race time, position, points]
-    J[Historical replay and fixed strategy] --> I
+    A["Historical F1 races — FastF1 / Jolpica<br/>Lap times, positions, pit stops, available tyre data"] --> B["Decision-time feature encoder<br/>Input X and historical pit label y"]
+    B --> C["Split by whole race<br/>Train / validation / test"]
+    C --> D["Train neural network<br/>MLP baseline; sequence models later"]
+    D --> E["Save checkpoint<br/>Weights, feature schema, preprocessing, threshold"]
+    E --> F["Held-out historical evaluation<br/>Precision, recall, F1, average precision"]
+    classDef data fill:#e8f0f7,stroke:#61758a,color:#172b3a
+    classDef model fill:#e0f2ee,stroke:#168578,color:#123b36
+    class A,B,C data
+    class D,E model
 ```
+
+Training examples use only values available before the predicted pit action. Model selection and threshold tuning use validation races; test races remain held out. A saved checkpoint is the artifact that Stage B consumes.
+
+### B. Closed-loop simulated decision-making
+
+```mermaid
+flowchart TD
+    A["TUM simulated race state<br/>Lap t; information available at decision time"] --> B["Same feature encoder<br/>Same definitions, units and preprocessing"]
+    B --> C["Trained neural network<br/>Load Stage A checkpoint; predict pit probability"]
+    C --> D["Policy adapter<br/>Threshold + legal compound / stay-out rule"]
+    D --> E["TUM executes action<br/>Advance simulated race state"]
+    E --> F{"Race finished?"}
+    F -->|No: next lap| A
+    F -->|Yes| G["Race outcomes<br/>Time, finishing position, action trace"]
+    H["Historical replay / fixed strategy<br/>Same initial conditions and other driver policies"] --> I["Paired strategy comparison"]
+    G --> I
+    classDef sim fill:#e8f0f7,stroke:#61758a,color:#172b3a
+    classDef model fill:#e0f2ee,stroke:#168578,color:#123b36
+    class A,E sim
+    class B,C,D model
+```
+
+The network receives simulated observations after an intervention, not future historical states. Its fitted weights remain fixed during this evaluation. Predicting past actions and improving simulated race outcomes are different research questions. Neither diagram claims that the trained-policy integration is complete.
 
 - **Data:** FastF1 race timing and tyre data, with one ordered sequence per driver/race. Features and labels must be separated at the point when a pit decision can be made.
 - **Models:** a fixed tyre-age rule, logistic regression or MLP as a current-state baseline, then a causal GRU/LSTM (TCN if feasible) to test whether history adds information. An MLP learns nonlinear relationships between current features; a GRU/LSTM processes ordered observations and can retain information from prior laps.
@@ -41,34 +67,40 @@ Upstream simulator: [TUMFTM/race-simulation](https://github.com/TUMFTM/race-simu
 
 | Component | Status / evidence |
 |---|---|
-| Simulator | Ported to Python 3.11 in commit [d86ff05](https://github.com/hitotoro24/cs682-f1-meets-ai/commit/d86ff05c56b456fbded2c3581fdc2ae30a219247). |
-| Historical replay | [Sanity-check script](race-simulation/experiments/sanity_check.py) and [saved output](race-simulation/experiments/sanity_Silverstone_2019.csv) exist. |
-| FastF1 training pipeline | Minimal shared NumPy encoder and FastF1 extraction implemented; real data not run here. |
-| Learned policy | PyTorch MLP and synthetic training smoke test implemented and tested; no model trained on real data. |
-| Integrated comparison | VSE hook and fixed lap-24 experiment implemented; live simulator execution pending. |
+| Simulator | Original TUM implementation runs locally in Python 3.11; vendor code retained. |
+| Historical replay | Local 52-lap replay and controlled timing intervention executed; evidence in [PR #6](https://github.com/hitotoro24/cs682-f1-meets-ai/pull/6). |
+| Historical data | Public Jolpica classification, VER lap times and pit records retrieved; richer FastF1 session extraction blocked by account access. |
+| Neural network | Three-feature PyTorch MLP and synthetic training smoke test implemented; three pipeline tests passed locally. Real-data training not yet established. |
+| Learned policy | Manual VSE intervention executed. A trained historical-data policy is not yet deployed. |
 
-The committed replay CSV records Hamilton P1 in both real and simulated races, with simulated winner time 4878.23 s versus actual 4868.45 s. Verstappen is P2 in simulation versus P5 in reality. This is evidence of an existing replay output and a reason to investigate simulator fidelity, not proof of accuracy or an independently reproduced result.
+### Silverstone 2019 proof of concept
 
-## Start here — guided proof of concept
+| Verstappen strategy | Pit laps | Finish | Race time (s) |
+|---|---|---:|---:|
+| Real race | 13, 20 | P5 | 4907.910 |
+| TUM historical replay | 13, 20 | P2 | 4890.732 |
+| TUM delayed second stop | 13, 24 | P8 | 4920.468 |
 
-- [01_silverstone_proof_of_concept.ipynb](01_silverstone_proof_of_concept.ipynb): coursework-style notebook, with setup, purpose, tests, inline questions and opt-in real-data/simulator cells.
-- [f1_ai/pit_pipeline.py](f1_ai/pit_pipeline.py): shared NumPy encoding, FastF1 examples, PyTorch MLP, synthetic test and VSE decision trace.
-- [Experiment plan](docs/experiment_plan.md): E0–E5, concrete deliverables, dependencies and acceptance criteria. Workstreams remain unassigned.
+The controlled timing intervention held other driver schedules, the first stop, compound sequence and event inputs fixed. Both scenarios completed 52 laps, with identical trajectories through lap 19. Delaying the second stop added 29.736 seconds in the simulator. This is evidence of a working experimental environment, not a trained-NN result or real-world optimality.
 
-From the repository root, activate the existing Python 3.11 simulator environment (see below), then:
+Review the [executed notebook](https://github.com/hitotoro24/cs682-f1-meets-ai/blob/6364d0e15e55c88c0a5e5c11a6c14cb63ca5921b/02_silverstone_simulator_walkthrough.ipynb), [verification record](https://github.com/hitotoro24/cs682-f1-meets-ai/blob/6364d0e15e55c88c0a5e5c11a6c14cb63ca5921b/docs/silverstone_2019_run.md) and [52-lap trace](https://github.com/hitotoro24/cs682-f1-meets-ai/blob/6364d0e15e55c88c0a5e5c11a6c14cb63ca5921b/docs/experiments/ver_stop_timing_trace.csv). These artifacts are pinned to the reviewed experiment commit while PR #6 is open.
+
+## Start here
+
+- [Shared pipeline](f1_ai/pit_pipeline.py): NumPy encoding, historical examples, PyTorch MLP and VSE intervention.
+- [Experiment plan](docs/experiment_plan.md): E0–E5, dependencies and acceptance criteria.
+- [Team execution guide (PR #5)](https://github.com/hitotoro24/cs682-f1-meets-ai/pull/5): interfaces, handoffs and run records.
+
+From the repository root, in the compatible Python 3.11 environment:
 
 ```bash
-python -m pip install torch jupyter pytest
 python -m f1_ai.pit_pipeline smoke
 python -m pytest -q
-python -m f1_ai.pit_pipeline data   # requires live FastF1 lap access
-python -m f1_ai.pit_pipeline race   # requires working TUM dependencies
-jupyter notebook 01_silverstone_proof_of_concept.ipynb
+python -m f1_ai.pit_pipeline race
+python -m f1_ai.pit_pipeline data  # currently requires session-data access
 ```
 
-Run the smoke test first. Real modes are intentionally separate, so broken data access cannot silently produce toy race results. Outputs go to `local_results/`. The minimal input vector is start-of-lap progress, previous-lap position fraction and prior stop count. Expand features only after auditing both sources. The alternative forces a single VER stop at lap 24 on A2 to test the intervention; it does not use a trained model yet.
-
-**Verified:** three isolated tests passed (`python -m pytest -q`), including synthetic feature/timing checks, training smoke test and mock VSE intervention; toy BCE 0.714567 → 0.000583. From the saved prior replay, mean absolute position error is 1.90 and Spearman correlation is 0.901 across 20 drivers. Neither is new real-race training evidence. Live FastF1 retrieval, simulator execution and notebook end-to-end execution remain unverified here.
+The smoke test is synthetic, not generalization evidence. The manual VSE one-stop policy (lap 24 only) is distinct from the controlled two-stop timing comparison above. See the verification record for dependency setup and exact run commands.
 
 ## Reproduce the existing replay
 
@@ -109,7 +141,7 @@ Use Max Verstappen (VER) as the initial target driver, with other drivers follow
 
 Do not assume the FastF1 end-of-lap row exactly matches the simulator pre-pit state. Pit-in timing, final lap time, post-pit position and next compound can leak the action into features. Confirm alignment and use prior-lap information where necessary. The toy one-lap example is a wiring test, not a training sample sufficient to fit a model.
 
-## Open team workstreams (unassigned)
+## Team workstreams
 
 | Workstream | Immediate output | Report section |
 |---|---|---|
@@ -118,7 +150,7 @@ Do not assume the FastF1 end-of-lap row exactly matches the simulator pre-pit st
 | [Models](https://github.com/hitotoro24/cs682-f1-meets-ai/issues/3) | Design a current-state MLP baseline and later a causal GRU/LSTM using a common input schema; provide a small forward-pass test and document model input/output shapes. | Model methods, sequence comparison |
 | [Data and evaluation](https://github.com/hitotoro24/cs682-f1-meets-ai/issues/4) | Audit historical features/labels and class imbalance; define race-level splits and prediction metrics; check the one-lap example for leakage. | Data, evaluation, limitations |
 
-Before the next meeting (proposed checkpoint: Sunday November 22 at 3 PM), each workstream should produce a small PR or an issue comment containing the exact artifact produced, how it was tested, and any blocker. All tasks remain unassigned until the team reviews the scope and dependencies. Keep Notion for coordination and GitHub for reproducible artifacts; everybody contributes to the report.
+Before the next meeting (proposed checkpoint: Sunday November 22 at 3 PM), each workstream should produce a small PR or an issue comment containing the exact artifact produced, how it was tested, and any blocker. See the issue tracker and November 20 team meeting notes for current ownership. Keep Notion for coordination and GitHub for reproducible artifacts; everybody contributes to the report.
 
 ## Scope after the milestone
 
@@ -126,6 +158,6 @@ The proposal plans historical training across the whole field (2019–2025, race
 
 ## Contributing
 
-Use a short-lived branch for each task, keep changes focused, and open a PR with purpose, inputs/outputs, reproducible command, observed result and limitations. Do not commit raw credentials, account data or large downloaded caches. Preserve upstream code attribution and licenses. Keep the course project separate from unrelated F1 optimization repositories.
+Keep `main` as the shared entry point: project overview, architecture, setup instructions and reviewed reusable code/results. Do development and exploratory experiments on separate owner/task branches. Keep changes focused and open a PR with purpose, inputs/outputs, reproducible command, observed result and limitations. Review before merging; no experimental branch is automatically merged into main. Do not commit raw credentials, account data or large downloaded caches. Preserve upstream code attribution and licenses. Keep the course project separate from unrelated F1 optimization repositories.
 
 Team: Anh Nguyen, Henry Yang, Tony Hwang, Shujie Hua.
