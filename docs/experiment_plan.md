@@ -60,3 +60,5 @@ Use NumPy for feature transformations, mathematical checks and array operations;
 - Local Python 3.13.5, PyTorch 2.10.0+cpu, NumPy 2.3.5: the exact committed `f1_ai/pit_pipeline.py` (blob `0f191c9bcae059c4fd641aac717e823c5464095a`) passed the synthetic feature/pit-timing checks; toy BCE 0.714567 -> 0.000583, logits shape (3,). Not generalization evidence.
 - Notebook authored but not executed end-to-end. Live FastF1 extraction and TUM intervention remain unverified because FastF1/TensorFlow are absent and network access is unavailable in the authoring environment.
 - The saved prior replay is real repository evidence, not a fresh simulation. Real-data access, mapping, intervention, model training and test results must be established on the team's machine.
+
+- Three isolated tests passed (`python -m pytest -q`, 3 passed). The mock VSE confirms that the wrapper changes the target driver's pit schedule, leaves another driver's schedule unchanged, restores the original method, and deletes the temporary configuration. The exact test file blob is `7adb9d014e300a0dac588cdb4d4620c963d015a7`. This is not validation of the real simulator.
