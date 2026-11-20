@@ -58,8 +58,9 @@ The committed replay CSV records Hamilton P1 in both real and simulated races, w
 From the repository root, activate the existing Python 3.11 simulator environment (see below), then:
 
 ```bash
-python -m pip install torch jupyter
+python -m pip install torch jupyter pytest
 python -m f1_ai.pit_pipeline smoke
+python -m pytest -q
 python -m f1_ai.pit_pipeline data   # requires live FastF1 lap access
 python -m f1_ai.pit_pipeline race   # requires working TUM dependencies
 jupyter notebook 01_silverstone_proof_of_concept.ipynb
@@ -67,7 +68,7 @@ jupyter notebook 01_silverstone_proof_of_concept.ipynb
 
 Run the smoke test first. Real modes are intentionally separate, so broken data access cannot silently produce toy race results. Outputs go to `local_results/`. The minimal input vector is start-of-lap progress, previous-lap position fraction and prior stop count. Expand features only after auditing both sources. The alternative forces a single VER stop at lap 24 on A2 to test the intervention; it does not use a trained model yet.
 
-**Verified:** synthetic feature/timing checks and training smoke test passed; toy BCE 0.714567 → 0.000583. From the saved prior replay, mean absolute position error is 1.90 and Spearman correlation is 0.901 across 20 drivers. Neither is new real-race training evidence. Live FastF1 retrieval, simulator execution and notebook end-to-end execution remain unverified here.
+**Verified:** three isolated tests passed (`python -m pytest -q`), including synthetic feature/timing checks, training smoke test and mock VSE intervention; toy BCE 0.714567 → 0.000583. From the saved prior replay, mean absolute position error is 1.90 and Spearman correlation is 0.901 across 20 drivers. Neither is new real-race training evidence. Live FastF1 retrieval, simulator execution and notebook end-to-end execution remain unverified here.
 
 ## Reproduce the existing replay
 
